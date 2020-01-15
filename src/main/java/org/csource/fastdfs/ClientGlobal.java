@@ -16,8 +16,11 @@ import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 
 /**
  * Global variables
@@ -49,6 +52,9 @@ public class ClientGlobal {
   public static final String PROP_KEY_CONNECTION_POOL_MAX_WAIT_TIME_IN_MS = "fastdfs.connection_pool.max_wait_time_in_ms";
 
 
+  public static final String PROP_KEY_STORAGE_SERVER_IP_MAPPING = "fastdfs.storage_server.ip_mapping";
+  
+
   public static final int DEFAULT_CONNECT_TIMEOUT = 5; //second
   public static final int DEFAULT_NETWORK_TIMEOUT = 30; //second
   public static final String DEFAULT_CHARSET = "UTF-8";
@@ -75,6 +81,8 @@ public class ClientGlobal {
 
   public static TrackerGroup g_tracker_group;
 
+  public static Map<String,String> storageMapping;
+
   private ClientGlobal() {
   }
 
@@ -83,7 +91,7 @@ public class ClientGlobal {
    *
    * @param conf_filename config filename
    */
-  public static void init(String conf_filename) throws IOException, MyException {
+  public static void init(final String conf_filename) throws IOException, MyException {
     IniFileReader iniReader;
     String[] szTrackerServers;
     String[] parts;
@@ -94,13 +102,13 @@ public class ClientGlobal {
     if (g_connect_timeout < 0) {
       g_connect_timeout = DEFAULT_CONNECT_TIMEOUT;
     }
-    g_connect_timeout *= 1000; //millisecond
+    g_connect_timeout *= 1000; // millisecond
 
     g_network_timeout = iniReader.getIntValue("network_timeout", DEFAULT_NETWORK_TIMEOUT);
     if (g_network_timeout < 0) {
       g_network_timeout = DEFAULT_NETWORK_TIMEOUT;
     }
-    g_network_timeout *= 1000; //millisecond
+    g_network_timeout *= 1000; // millisecond
 
     g_charset = iniReader.getStrValue("charset");
     if (g_charset == null || g_charset.length() == 0) {
@@ -112,7 +120,7 @@ public class ClientGlobal {
       throw new MyException("item \"tracker_server\" in " + conf_filename + " not found");
     }
 
-    InetSocketAddress[] tracker_servers = new InetSocketAddress[szTrackerServers.length];
+    final InetSocketAddress[] tracker_servers = new InetSocketAddress[szTrackerServers.length];
     for (int i = 0; i < szTrackerServers.length; i++) {
       parts = szTrackerServers[i].split("\\:", 2);
       if (parts.length != 2) {
@@ -129,57 +137,64 @@ public class ClientGlobal {
       g_secret_key = iniReader.getStrValue("http.secret_key");
     }
     g_connection_pool_enabled = iniReader.getBoolValue("connection_pool.enabled", DEFAULT_CONNECTION_POOL_ENABLED);
-    g_connection_pool_max_count_per_entry = iniReader.getIntValue("connection_pool.max_count_per_entry", DEFAULT_CONNECTION_POOL_MAX_COUNT_PER_ENTRY);
-    g_connection_pool_max_idle_time = iniReader.getIntValue("connection_pool.max_idle_time", DEFAULT_CONNECTION_POOL_MAX_IDLE_TIME);
+    g_connection_pool_max_count_per_entry = iniReader.getIntValue("connection_pool.max_count_per_entry",
+        DEFAULT_CONNECTION_POOL_MAX_COUNT_PER_ENTRY);
+    g_connection_pool_max_idle_time = iniReader.getIntValue("connection_pool.max_idle_time",
+        DEFAULT_CONNECTION_POOL_MAX_IDLE_TIME);
     if (g_connection_pool_max_idle_time < 0) {
       g_connection_pool_max_idle_time = DEFAULT_CONNECTION_POOL_MAX_IDLE_TIME;
     }
     g_connection_pool_max_idle_time *= 1000;
-    g_connection_pool_max_wait_time_in_ms = iniReader.getIntValue("connection_pool.max_wait_time_in_ms", DEFAULT_CONNECTION_POOL_MAX_WAIT_TIME_IN_MS);
+    g_connection_pool_max_wait_time_in_ms = iniReader.getIntValue("connection_pool.max_wait_time_in_ms",
+        DEFAULT_CONNECTION_POOL_MAX_WAIT_TIME_IN_MS);
     if (g_connection_pool_max_wait_time_in_ms < 0) {
       g_connection_pool_max_wait_time_in_ms = DEFAULT_CONNECTION_POOL_MAX_WAIT_TIME_IN_MS;
+    }
+    final String[] szStorageMappingArr = iniReader.getValues("storage_server.ip_mapping");
+    if(szStorageMappingArr!=null){
+      initByStorageMappings(szStorageMappingArr);
     }
   }
 
   /**
    * load from properties file
    *
-   * @param propsFilePath properties file path, eg:
-   *                      "fastdfs-client.properties"
+   * @param propsFilePath properties file path, eg: "fastdfs-client.properties"
    *                      "config/fastdfs-client.properties"
    *                      "/opt/fastdfs-client.properties"
    *                      "C:\\Users\\James\\config\\fastdfs-client.properties"
    *                      properties文件至少包含一个配置项 fastdfs.tracker_servers 例如：
-   *                      fastdfs.tracker_servers = 10.0.11.245:22122,10.0.11.246:22122
-   *                      server的IP和端口用冒号':'分隔
+   *                      fastdfs.tracker_servers =
+   *                      10.0.11.245:22122,10.0.11.246:22122 server的IP和端口用冒号':'分隔
    *                      server之间用逗号','分隔
    */
-  public static void initByProperties(String propsFilePath) throws IOException, MyException {
-    Properties props = new Properties();
-    InputStream in = IniFileReader.loadFromOsFileSystemOrClasspathAsStream(propsFilePath);
+  public static void initByProperties(final String propsFilePath) throws IOException, MyException {
+    final Properties props = new Properties();
+    final InputStream in = IniFileReader.loadFromOsFileSystemOrClasspathAsStream(propsFilePath);
     if (in != null) {
       props.load(in);
     }
     initByProperties(props);
   }
 
-  public static void initByProperties(Properties props) throws IOException, MyException {
-    String trackerServersConf = props.getProperty(PROP_KEY_TRACKER_SERVERS);
+  public static void initByProperties(final Properties props) throws IOException, MyException {
+    final String trackerServersConf = props.getProperty(PROP_KEY_TRACKER_SERVERS);
     if (trackerServersConf == null || trackerServersConf.trim().length() == 0) {
       throw new MyException(String.format("configure item %s is required", PROP_KEY_TRACKER_SERVERS));
     }
     initByTrackers(trackerServersConf.trim());
 
-    String connectTimeoutInSecondsConf = props.getProperty(PROP_KEY_CONNECT_TIMEOUT_IN_SECONDS);
-    String networkTimeoutInSecondsConf = props.getProperty(PROP_KEY_NETWORK_TIMEOUT_IN_SECONDS);
-    String charsetConf = props.getProperty(PROP_KEY_CHARSET);
-    String httpAntiStealTokenConf = props.getProperty(PROP_KEY_HTTP_ANTI_STEAL_TOKEN);
-    String httpSecretKeyConf = props.getProperty(PROP_KEY_HTTP_SECRET_KEY);
-    String httpTrackerHttpPortConf = props.getProperty(PROP_KEY_HTTP_TRACKER_HTTP_PORT);
-    String poolEnabled = props.getProperty(PROP_KEY_CONNECTION_POOL_ENABLED);
-    String poolMaxCountPerEntry = props.getProperty(PROP_KEY_CONNECTION_POOL_MAX_COUNT_PER_ENTRY);
-    String poolMaxIdleTime  = props.getProperty(PROP_KEY_CONNECTION_POOL_MAX_IDLE_TIME);
-    String poolMaxWaitTimeInMS = props.getProperty(PROP_KEY_CONNECTION_POOL_MAX_WAIT_TIME_IN_MS);
+    final String connectTimeoutInSecondsConf = props.getProperty(PROP_KEY_CONNECT_TIMEOUT_IN_SECONDS);
+    final String networkTimeoutInSecondsConf = props.getProperty(PROP_KEY_NETWORK_TIMEOUT_IN_SECONDS);
+    final String charsetConf = props.getProperty(PROP_KEY_CHARSET);
+    final String httpAntiStealTokenConf = props.getProperty(PROP_KEY_HTTP_ANTI_STEAL_TOKEN);
+    final String httpSecretKeyConf = props.getProperty(PROP_KEY_HTTP_SECRET_KEY);
+    final String httpTrackerHttpPortConf = props.getProperty(PROP_KEY_HTTP_TRACKER_HTTP_PORT);
+    final String poolEnabled = props.getProperty(PROP_KEY_CONNECTION_POOL_ENABLED);
+    final String poolMaxCountPerEntry = props.getProperty(PROP_KEY_CONNECTION_POOL_MAX_COUNT_PER_ENTRY);
+    final String poolMaxIdleTime = props.getProperty(PROP_KEY_CONNECTION_POOL_MAX_IDLE_TIME);
+    final String poolMaxWaitTimeInMS = props.getProperty(PROP_KEY_CONNECTION_POOL_MAX_WAIT_TIME_IN_MS);
+    final String storageIpMapping = props.getProperty(PROP_KEY_STORAGE_SERVER_IP_MAPPING);
 
     if (connectTimeoutInSecondsConf != null && connectTimeoutInSecondsConf.trim().length() != 0) {
       g_connect_timeout = Integer.parseInt(connectTimeoutInSecondsConf.trim()) * 1000;
@@ -202,7 +217,7 @@ public class ClientGlobal {
     if (poolEnabled != null && poolEnabled.trim().length() != 0) {
       g_connection_pool_enabled = Boolean.parseBoolean(poolEnabled);
     }
-    if (poolMaxCountPerEntry != null && poolMaxCountPerEntry.trim().length() != 0 ) {
+    if (poolMaxCountPerEntry != null && poolMaxCountPerEntry.trim().length() != 0) {
       g_connection_pool_max_count_per_entry = Integer.parseInt(poolMaxCountPerEntry);
     }
     if (poolMaxIdleTime != null && poolMaxIdleTime.trim().length() != 0) {
@@ -211,31 +226,54 @@ public class ClientGlobal {
     if (poolMaxWaitTimeInMS != null && poolMaxWaitTimeInMS.trim().length() != 0) {
       g_connection_pool_max_wait_time_in_ms = Integer.parseInt(poolMaxWaitTimeInMS);
     }
+
+    if (storageIpMapping != null && storageIpMapping.trim().length() != 0) {
+      initByStorageMappings(storageIpMapping.split(","));
+    }
   }
 
   /**
    * load from properties file
    *
    * @param trackerServers 例如："10.0.11.245:22122,10.0.11.246:22122"
-   *                       server的IP和端口用冒号':'分隔
-   *                       server之间用逗号','分隔
+   *                       server的IP和端口用冒号':'分隔 server之间用逗号','分隔
    */
-  public static void initByTrackers(String trackerServers) throws IOException, MyException {
-    List<InetSocketAddress> list = new ArrayList();
-    String spr1 = ",";
-    String spr2 = ":";
-    String[] arr1 = trackerServers.trim().split(spr1);
-    for (String addrStr : arr1) {
-      String[] arr2 = addrStr.trim().split(spr2);
-      String host = arr2[0].trim();
-      int port = Integer.parseInt(arr2[1].trim());
+  public static void initByTrackers(final String trackerServers) throws IOException, MyException {
+    final List<InetSocketAddress> list = new ArrayList();
+    final String spr1 = ",";
+    final String spr2 = ":";
+    final String[] arr1 = trackerServers.trim().split(spr1);
+    for (final String addrStr : arr1) {
+      final String[] arr2 = addrStr.trim().split(spr2);
+      final String host = arr2[0].trim();
+      final int port = Integer.parseInt(arr2[1].trim());
       list.add(new InetSocketAddress(host, port));
     }
-    InetSocketAddress[] trackerAddresses = list.toArray(new InetSocketAddress[list.size()]);
+    final InetSocketAddress[] trackerAddresses = list.toArray(new InetSocketAddress[list.size()]);
     initByTrackers(trackerAddresses);
   }
 
-  public static void initByTrackers(InetSocketAddress[] trackerAddresses) throws IOException, MyException {
+  public static void initByStorageMappings(final String[] storageMappigStringArr) {
+    
+    if(storageMappigStringArr!=null){
+      for(final String  storageMappigStr : storageMappigStringArr){
+        initByStorageMapping(storageMappigStr);
+      }
+    }
+
+  }
+
+  public static void initByStorageMapping(final String storageMappigString) {
+    final String spr1 = "->";
+    final String[] arr1 = storageMappigString.trim().split(spr1);
+    if (storageMapping == null) {
+      storageMapping = new HashMap<String,String>();
+    }
+    storageMapping.put(arr1[0].trim(), arr1[0].trim());
+
+  }
+
+  public static void initByTrackers(final InetSocketAddress[] trackerAddresses) throws IOException, MyException {
     g_tracker_group = new TrackerGroup(trackerAddresses);
   }
 
@@ -246,8 +284,8 @@ public class ClientGlobal {
    * @param port    port number
    * @return connected Socket object
    */
-  public static Socket getSocket(String ip_addr, int port) throws IOException {
-    Socket sock = new Socket();
+  public static Socket getSocket(final String ip_addr, final int port) throws IOException {
+    final Socket sock = new Socket();
     sock.setSoTimeout(ClientGlobal.g_network_timeout);
     sock.connect(new InetSocketAddress(ip_addr, port), ClientGlobal.g_connect_timeout);
     return sock;
@@ -259,8 +297,8 @@ public class ClientGlobal {
    * @param addr InetSocketAddress object, including ip address and port
    * @return connected Socket object
    */
-  public static Socket getSocket(InetSocketAddress addr) throws IOException {
-    Socket sock = new Socket();
+  public static Socket getSocket(final InetSocketAddress addr) throws IOException {
+    final Socket sock = new Socket();
     sock.setReuseAddress(true);
     sock.setSoTimeout(ClientGlobal.g_network_timeout);
     sock.connect(addr, ClientGlobal.g_connect_timeout);
@@ -271,7 +309,7 @@ public class ClientGlobal {
     return g_connect_timeout;
   }
 
-  public static void setG_connect_timeout(int connect_timeout) {
+  public static void setG_connect_timeout(final int connect_timeout) {
     ClientGlobal.g_connect_timeout = connect_timeout;
   }
 
@@ -279,7 +317,7 @@ public class ClientGlobal {
     return g_network_timeout;
   }
 
-  public static void setG_network_timeout(int network_timeout) {
+  public static void setG_network_timeout(final int network_timeout) {
     ClientGlobal.g_network_timeout = network_timeout;
   }
 
@@ -287,7 +325,7 @@ public class ClientGlobal {
     return g_charset;
   }
 
-  public static void setG_charset(String charset) {
+  public static void setG_charset(final String charset) {
     ClientGlobal.g_charset = charset;
   }
 
@@ -295,7 +333,7 @@ public class ClientGlobal {
     return g_tracker_http_port;
   }
 
-  public static void setG_tracker_http_port(int tracker_http_port) {
+  public static void setG_tracker_http_port(final int tracker_http_port) {
     ClientGlobal.g_tracker_http_port = tracker_http_port;
   }
 
@@ -307,7 +345,7 @@ public class ClientGlobal {
     return g_anti_steal_token;
   }
 
-  public static void setG_anti_steal_token(boolean anti_steal_token) {
+  public static void setG_anti_steal_token(final boolean anti_steal_token) {
     ClientGlobal.g_anti_steal_token = anti_steal_token;
   }
 
@@ -315,7 +353,7 @@ public class ClientGlobal {
     return g_secret_key;
   }
 
-  public static void setG_secret_key(String secret_key) {
+  public static void setG_secret_key(final String secret_key) {
     ClientGlobal.g_secret_key = secret_key;
   }
 
@@ -323,7 +361,7 @@ public class ClientGlobal {
     return g_tracker_group;
   }
 
-  public static void setG_tracker_group(TrackerGroup tracker_group) {
+  public static void setG_tracker_group(final TrackerGroup tracker_group) {
     ClientGlobal.g_tracker_group = tracker_group;
   }
 
@@ -334,11 +372,24 @@ public class ClientGlobal {
   public static String configInfo() {
     String trackerServers = "";
     if (g_tracker_group != null) {
-      InetSocketAddress[] trackerAddresses = g_tracker_group.tracker_servers;
-      for (InetSocketAddress inetSocketAddress : trackerAddresses) {
+      final InetSocketAddress[] trackerAddresses = g_tracker_group.tracker_servers;
+      for (final InetSocketAddress inetSocketAddress : trackerAddresses) {
         if(trackerServers.length() > 0) trackerServers += ",";
         trackerServers += inetSocketAddress.toString().substring(1);
       }
+    }
+    String storageMappings = "";
+    if(storageMapping!=null){
+      Set<String> keySet = storageMapping.keySet();
+      for(String key : keySet){
+       
+        String value = storageMapping.get(key);
+        String str = key+"->"+value;
+        if(trackerServers.length() > 0) storageMappings += ",";
+        storageMappings += str;
+      }
+      
+      
     }
     return "{"
       + "\n  g_connect_timeout(ms) = " + g_connect_timeout
@@ -352,6 +403,7 @@ public class ClientGlobal {
       + "\n  g_connection_pool_max_idle_time(ms) = " + g_connection_pool_max_idle_time
       + "\n  g_connection_pool_max_wait_time_in_ms(ms) = " + g_connection_pool_max_wait_time_in_ms
       + "\n  trackerServers = " + trackerServers
+      + "\n  storageMapping = " + storageMappings
       + "\n}";
   }
 

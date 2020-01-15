@@ -136,6 +136,17 @@ public class TrackerClient {
                     + ProtoCommon.FDFS_IPADDR_SIZE - 1);
             store_path = pkgInfo.body[ProtoCommon.TRACKER_QUERY_STORAGE_STORE_BODY_LEN - 1];
 
+            if(ClientGlobal.storageMapping!=null){
+                String address = ClientGlobal.storageMapping.get(ip_addr+":"+port);
+                if(address!=null && address.trim().length()!=0){
+                    String[] arr1 = address.trim().split(":");
+                    ip_addr = arr1[0];
+                    if(arr1.length>1){
+                        port = Integer.valueOf(arr1[1]);
+                    }
+                }
+            }
+
             return new StorageServer(ip_addr, port, store_path);
         } catch (IOException ex) {
             try {
