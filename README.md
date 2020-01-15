@@ -20,13 +20,18 @@ mvn clean install
 mvn install:install-file -DgroupId=org.csource -DartifactId=fastdfs-client-java -Dversion=${version} -Dpackaging=jar -Dfile=fastdfs-client-java-${version}.jar
 ```
 
+## 1.29-RELEASE 更新
+
+    新增storage server ip:port mapping to pxory ip:port
+
+
 ## 在您的maven项目pom.xml中添加依赖
 
 ```xml
 <dependency>
     <groupId>org.csource</groupId>
     <artifactId>fastdfs-client-java</artifactId>
-    <version>1.29-SNAPSHOT</version>
+    <version>1.29-RELEASE</version>
 </dependency>
 ```
 
@@ -58,6 +63,9 @@ connection_pool.enabled = true
 connection_pool.max_count_per_entry = 500
 connection_pool.max_idle_time = 3600
 connection_pool.max_wait_time_in_ms = 1000
+
+storage_server.ip_mapping = 10.0.11.202:23000->10.0.12.202:23000
+storage_server.ip_mapping = 10.0.11.203:23000->10.0.12.203:23000
 ```
 
     注1：tracker_server指向您自己IP地址和端口，1-n个
@@ -90,6 +98,9 @@ fastdfs.connection_pool.enabled = true
 fastdfs.connection_pool.max_count_per_entry = 500
 fastdfs.connection_pool.max_idle_time = 3600
 fastdfs.connection_pool.max_wait_time_in_ms = 1000
+
+fastdfs.storage_server.ip_mapping = 10.0.11.202:23000->10.0.12.202:23000,10.0.11.203:23000->10.0.12.203:23000
+
 ```
 
     注1：properties 配置文件中属性名跟 conf 配置文件不尽相同，并且统一加前缀"fastdfs."，便于整合到用户项目配置文件
@@ -137,5 +148,6 @@ ClientGlobal.configInfo(): {
   g_connection_pool_max_idle_time(ms) = 3600000
   g_connection_pool_max_wait_time_in_ms(ms) = 1000
   trackerServers = 10.0.11.101:22122,10.0.11.102:22122
+  
 }
 ```
