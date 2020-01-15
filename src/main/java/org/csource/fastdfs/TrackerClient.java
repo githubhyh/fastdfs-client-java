@@ -147,6 +147,8 @@ public class TrackerClient {
                 }
             }
 
+            System.out.println(ip_addr+":"+port);
+
             return new StorageServer(ip_addr, port, store_path);
         } catch (IOException ex) {
             try {

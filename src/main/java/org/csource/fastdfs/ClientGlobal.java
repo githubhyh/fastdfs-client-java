@@ -269,7 +269,7 @@ public class ClientGlobal {
     if (storageMapping == null) {
       storageMapping = new HashMap<String,String>();
     }
-    storageMapping.put(arr1[0].trim(), arr1[0].trim());
+    storageMapping.put(arr1[0].trim(), arr1[1].trim());
 
   }
 
@@ -385,7 +385,7 @@ public class ClientGlobal {
        
         String value = storageMapping.get(key);
         String str = key+"->"+value;
-        if(trackerServers.length() > 0) storageMappings += ",";
+        if(storageMappings.length() > 0) storageMappings += ",";
         storageMappings += str;
       }
       
