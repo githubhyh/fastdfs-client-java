@@ -1,7 +1,16 @@
 
+
+
 # FastDFS java client SDK
 
 FastDFS Java Client API may be copied only under the terms of the BSD license.
+
+## 新增 storage_server IP 映射
+
+```
+storage_server.ip_mapping = 10.0.11.202:23000->10.0.12.202:23000
+storage_server.ip_mapping = 10.0.11.203:23000->10.0.12.203:23000
+```
 
 ## 使用ant从源码构建
 
